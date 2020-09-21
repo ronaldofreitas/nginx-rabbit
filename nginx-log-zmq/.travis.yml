@@ -1,0 +1,26 @@
+language: c
+compiler:
+  - gcc
+  - clang
+
+env:
+  - VER_NGINX=1.8.1
+  - VER_NGINX=1.10.3
+  - VER_NGINX=1.12.1
+  - VER_NGINX=1.13.5
+
+sudo: false
+
+addons:
+  apt:
+    packages:
+      - libzmq3-dev
+
+install:
+  - mkdir ./vendor && cd ./vendor
+  - wget "http://nginx.org/download/nginx-${VER_NGINX}.tar.gz" && tar -xf "nginx-${VER_NGINX}.tar.gz"
+
+  - cd nginx-${VER_NGINX}
+  - ./configure --add-module=../..
+
+script: make

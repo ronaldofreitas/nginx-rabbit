@@ -1,0 +1,133 @@
+#FROM nginx:alpine AS builder
+FROM nginx:alpine
+
+
+# docker build -t redis-nginx . && docker rm redis-nginx-cont && docker run --name redis-nginx-cont -v /root/nginx/conf:/etc/nginx/conf.d --net=host redis-nginx
+
+
+# docker build -t ronafreitasweb/pipe2be:1.0 .
+# docker build -t redis-nginx . && docker rm redis-nginx-cont && docker run --name redis-nginx-cont -v /root/nginx/conf:/etc/nginx/conf.d --net=host redis-nginx
+
+
+# nginx:alpine contains NGINX_VERSION environment variable, like so:
+#ENV NGINX_VERSION 1.15.0
+
+# Our NCHAN version
+#ENV NCHAN_VERSION 1.1.15
+
+# Download sources
+#RUN wget "http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" -O nginx.tar.gz && \
+#  wget "https://github.com/slact/nchan/archive/v${NCHAN_VERSION}.tar.gz" -O nchan.tar.gz
+
+
+# For latest build deps, see https://github.com/nginxinc/docker-nginx/blob/master/mainline/alpine/Dockerfile
+RUN apk add --no-cache --virtual .build-deps \
+  gcc \
+  libc-dev \
+  make \
+  openssl-dev \
+  pcre-dev \
+  zlib-dev \
+  linux-headers \
+  curl \
+  gnupg \
+  libxslt-dev \
+  gd-dev 
+  #geoip-dev 
+  #libmaxminddb-dev \
+  #libmaxminddb
+
+#RUN apt-get install -y -qq libzmq-dev
+
+WORKDIR /usr/local/
+COPY njs/ /usr/src/njs
+#COPY nchan/ /usr/src/nchan
+#COPY redis2-nginx-module/ /usr/src/redis2-nginx-module
+#COPY ngx_http_geoip2_module/ /usr/src/ngx_http_geoip2_module
+
+#nginx-1.19.2
+COPY nginx /usr/local
+COPY nginx.conf /usr/local/nginx/
+COPY stream.js /usr/local/nginx/
+COPY http.js /usr/local/nginx/
+COPY BILU.txt /usr/local/nginx/
+
+#WORKDIR /usr/src/
+#COPY nginx /usr/src/
+
+# Reuse same cli arguments as the nginx:alpine image used to build
+#RUN CONFARGS=$(nginx -V 2>&1 | sed -n -e 's/^.*arguments: //p') \
+	#tar -zxC /usr/src -f nginx-1.15.0.tar.gz && \
+  #tar -xzvf "nchan-1.1.15.tar.gz" && \
+  #NCHANDIR="$(pwd)/nchan" && \
+  #NCHANDIR=/usr/local/nchan && \
+  #cd /usr/src/nginx/ && \
+
+
+RUN ./configure \
+  --prefix=/etc/nginx \
+  --sbin-path=/usr/sbin/nginx \
+  --modules-path=/usr/lib/nginx/modules \
+  --conf-path=/etc/nginx/nginx.conf \
+  --error-log-path=/var/log/nginx/error.log \
+  --http-log-path=/var/log/nginx/access.log \
+  --pid-path=/var/run/nginx.pid \
+  --lock-path=/var/run/nginx.lock \
+  --http-client-body-temp-path=/var/cache/nginx/client_temp \
+  --http-proxy-temp-path=/var/cache/nginx/proxy_temp \
+  --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
+  --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp \
+  --http-scgi-temp-path=/var/cache/nginx/scgi_temp \
+  --with-perl_modules_path=/usr/lib/perl5/vendor_perl \
+  --user=nginx \
+  --group=nginx \
+  --with-compat \
+  #--with-file-aio \
+  --with-threads \
+  --with-http_addition_module \
+  #--with-http_auth_request_module \
+  --with-http_dav_module \
+  --with-http_flv_module \
+  --with-http_gunzip_module \
+  --with-http_gzip_static_module \
+  #--with-http_mp4_module \
+  --with-http_random_index_module \
+  --with-http_realip_module \
+  --with-http_secure_link_module \
+  --with-http_slice_module \
+  --with-http_ssl_module \
+  --with-http_stub_status_module \
+  --with-http_sub_module \
+  --with-http_v2_module \
+  --with-mail \
+  --with-mail_ssl_module \
+  #--with-stream \
+  #--with-stream_realip_module \
+  #--with-stream_ssl_module \
+  #--with-stream_ssl_preread_module \
+  #--with-http_geoip_module \
+  #--with-cc-opt="$(CFLAGS)" \
+  #--with-ld-opt="$(LDFLAGS)" \
+  #--with-cc-opt='-g -O2 -fPIE -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2' \
+  #--with-ld-opt='-Wl,-Bsymbolic-functions -fPIE -pie -Wl,-z,relro -Wl,-z,now' \
+  #--add-dynamic-module=/usr/src/redis2-nginx-module 
+  #--add-dynamic-module=/usr/src/ngx_http_geoip2_module \
+  #--add-dynamic-module=/usr/src/nchan 
+  --add-dynamic-module=/usr/src/njs/nginx 
+
+#--with-compat $CONFARGS --add-dynamic-module=$NCHANDIR && \
+RUN make && make install
+
+FROM nginx:alpine
+# Extract the dynamic module NCHAN from the builder image
+#COPY --from=builder /usr/local/nginx/modules/ngx_nchan_module.so /usr/local/nginx/modules/ngx_nchan_module.so
+#RUN rm /etc/nginx/conf.d/default.conf
+
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY stream.js /etc/nginx/stream.js
+COPY http.js /etc/nginx/http.js
+COPY BILU.txt /etc/nginx/BILU.txt
+#COPY default.conf /etc/nginx/conf.d/default.conf
+#EXPOSE 8001
+STOPSIGNAL SIGTERM
+CMD ["nginx", "-g", "daemon off;"]
